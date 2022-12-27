@@ -4430,6 +4430,7 @@ var members_Members = (function () {
         this.reset();
     }
     Members.prototype.get = function (id) {
+        return null;
         if (Object.prototype.hasOwnProperty.call(this.members, id)) {
             return {
                 id: id,
@@ -4450,24 +4451,17 @@ var members_Members = (function () {
         this.myID = id;
     };
     Members.prototype.onSubscription = function (subscriptionData) {
-        this.members = subscriptionData.presence.hash;
+        this.members = {};
         this.count = subscriptionData.presence.count;
         this.me = this.get(this.myID);
     };
     Members.prototype.addMember = function (memberData) {
-        if (this.get(memberData.user_id) === null) {
-            this.count++;
-        }
-        this.members[memberData.user_id] = memberData.user_info;
-        return this.get(memberData.user_id);
+        this.count++;
+        return memberData;
     };
     Members.prototype.removeMember = function (memberData) {
-        var member = this.get(memberData.user_id);
-        if (member) {
-            delete this.members[memberData.user_id];
-            this.count--;
-        }
-        return member;
+        this.count--;
+        return memberData;
     };
     Members.prototype.reset = function () {
         this.members = {};
