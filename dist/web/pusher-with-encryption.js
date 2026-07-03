@@ -3197,7 +3197,7 @@ var cb_encode = function (ccc) {
     ];
     return chars.join('');
 };
-var btoa = window.btoa ||
+var btoa = (typeof window !== 'undefined' && window.btoa) ||
     function (b) {
         return b.replace(/[\s\S]{1,3}/g, cb_encode);
     };
@@ -4068,7 +4068,8 @@ class NetInfo extends Dispatcher {
     constructor() {
         super();
         var self = this;
-        if (window.addEventListener !== undefined) {
+        if (typeof window !== 'undefined' &&
+            window.addEventListener !== undefined) {
             window.addEventListener('online', function () {
                 self.emit('online');
             }, false);
@@ -4517,10 +4518,22 @@ class PrivateChannel extends Channel {
 ;// ./src/core/channels/members.ts
 
 class Members {
-    constructor() {
+    constructor(channelName) {
+        this.channelName = channelName;
         this.reset();
     }
+    useScalableBehavior() {
+        const channelName = this.channelName || '';
+        const channelNameWithoutPrefix = channelName.indexOf('presence-') === 0
+            ? channelName.slice('presence-'.length)
+            : channelName;
+        return (channelNameWithoutPrefix.indexOf('Admin.') === 0 ||
+            channelNameWithoutPrefix.indexOf('Website.') === 0);
+    }
     get(id) {
+        if (this.useScalableBehavior()) {
+            return null;
+        }
         if (Object.prototype.hasOwnProperty.call(this.members, id)) {
             return {
                 id: id,
@@ -4540,11 +4553,17 @@ class Members {
         this.myID = id;
     }
     onSubscription(subscriptionData) {
-        this.members = subscriptionData.presence.hash;
+        this.members = this.useScalableBehavior()
+            ? {}
+            : subscriptionData.presence.hash;
         this.count = subscriptionData.presence.count;
         this.me = this.get(this.myID);
     }
     addMember(memberData) {
+        if (this.useScalableBehavior()) {
+            this.count++;
+            return memberData;
+        }
         if (this.get(memberData.user_id) === null) {
             this.count++;
         }
@@ -4552,6 +4571,10 @@ class Members {
         return this.get(memberData.user_id);
     }
     removeMember(memberData) {
+        if (this.useScalableBehavior()) {
+            this.count--;
+            return memberData;
+        }
         var member = this.get(memberData.user_id);
         if (member) {
             delete this.members[memberData.user_id];
@@ -4584,7 +4607,7 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 class PresenceChannel extends PrivateChannel {
     constructor(name, pusher) {
         super(name, pusher);
-        this.members = new Members();
+        this.members = new Members(name);
     }
     authorize(socketId, callback) {
         super.authorize(socketId, (error, authData) => __awaiter(this, void 0, void 0, function* () {
@@ -6001,15 +6024,17 @@ var Runtime = {
         return window.WebSocket || window.MozWebSocket;
     },
     setup(PusherClass) {
-        window.Pusher = PusherClass;
-        var initializeOnDocumentBody = () => {
-            this.onDocumentBody(PusherClass.ready);
-        };
-        if (!window.JSON) {
-            Dependencies.load('json2', {}, initializeOnDocumentBody);
-        }
-        else {
-            initializeOnDocumentBody();
+        if (typeof window !== 'undefined') {
+            window.Pusher = PusherClass;
+            var initializeOnDocumentBody = () => {
+                this.onDocumentBody(PusherClass.ready);
+            };
+            if (!window.JSON) {
+                Dependencies.load('json2', {}, initializeOnDocumentBody);
+            }
+            else {
+                initializeOnDocumentBody();
+            }
         }
     },
     getDocument() {

@@ -3,7 +3,9 @@ export default class Members {
     count: number;
     myID: any;
     me: any;
-    constructor();
+    channelName?: string;
+    constructor(channelName?: string);
+    private useScalableBehavior;
     get(id: string): any;
     each(callback: Function): void;
     setMyID(id: string): void;

@@ -17,7 +17,7 @@ export default class PresenceChannel extends PrivateChannel {
    */
   constructor(name: string, pusher: Pusher) {
     super(name, pusher);
-    this.members = new Members();
+    this.members = new Members(name);
   }
 
   /** Authorizes the connection as a member of the channel.

@@ -2917,7 +2917,7 @@ var cb_encode = function (ccc) {
     ];
     return chars.join('');
 };
-var btoa = self.btoa ||
+var btoa = (typeof self !== 'undefined' && self.btoa) ||
     function (b) {
         return b.replace(/[\s\S]{1,3}/g, cb_encode);
     };
@@ -3126,6 +3126,9 @@ function collections_all(array, test) {
 }
 function encodeParamsObject(data) {
     return mapObject(data, function (value) {
+        if (value === null) {
+            return '';
+        }
         if (typeof value === 'object') {
             value = safeJSONStringify(value);
         }
@@ -4151,10 +4154,22 @@ class PrivateChannel extends Channel {
 ;// ./src/core/channels/members.ts
 
 class Members {
-    constructor() {
+    constructor(channelName) {
+        this.channelName = channelName;
         this.reset();
     }
+    useScalableBehavior() {
+        const channelName = this.channelName || '';
+        const channelNameWithoutPrefix = channelName.indexOf('presence-') === 0
+            ? channelName.slice('presence-'.length)
+            : channelName;
+        return (channelNameWithoutPrefix.indexOf('Admin.') === 0 ||
+            channelNameWithoutPrefix.indexOf('Website.') === 0);
+    }
     get(id) {
+        if (this.useScalableBehavior()) {
+            return null;
+        }
         if (Object.prototype.hasOwnProperty.call(this.members, id)) {
             return {
                 id: id,
@@ -4174,11 +4189,17 @@ class Members {
         this.myID = id;
     }
     onSubscription(subscriptionData) {
-        this.members = subscriptionData.presence.hash;
+        this.members = this.useScalableBehavior()
+            ? {}
+            : subscriptionData.presence.hash;
         this.count = subscriptionData.presence.count;
         this.me = this.get(this.myID);
     }
     addMember(memberData) {
+        if (this.useScalableBehavior()) {
+            this.count++;
+            return memberData;
+        }
         if (this.get(memberData.user_id) === null) {
             this.count++;
         }
@@ -4186,6 +4207,10 @@ class Members {
         return this.get(memberData.user_id);
     }
     removeMember(memberData) {
+        if (this.useScalableBehavior()) {
+            this.count--;
+            return memberData;
+        }
         var member = this.get(memberData.user_id);
         if (member) {
             delete this.members[memberData.user_id];
@@ -4218,7 +4243,7 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 class PresenceChannel extends PrivateChannel {
     constructor(name, pusher) {
         super(name, pusher);
-        this.members = new Members();
+        this.members = new Members(name);
     }
     authorize(socketId, callback) {
         super.authorize(socketId, (error, authData) => __awaiter(this, void 0, void 0, function* () {
@@ -6139,9 +6164,7 @@ function buildChannelAuth(opts, pusher) {
                 channelAuthorization.headers = opts.auth.headers;
         }
         if ('authorizer' in opts) {
-            return {
-                customHandler: ChannelAuthorizerProxy(pusher, channelAuthorization, opts.authorizer),
-            };
+            channelAuthorization.customHandler = ChannelAuthorizerProxy(pusher, channelAuthorization, opts.authorizer);
         }
     }
     return channelAuthorization;
